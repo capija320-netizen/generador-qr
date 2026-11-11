@@ -1,0 +1,604 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Generador de códigos QR</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+  /* Layout: a two-pane workbench. Controls on the left, a large live QR preview on the right; stacks on phones. */
+  :root {
+    --bg: #f1f4f3;
+    --surface: #ffffff;
+    --surface-2: #e8edeb;
+    --ink: #121a18;
+    --ink-soft: #52605c;
+    --line: #cfd8d5;
+    --accent: #0c7a64;
+    --accent-ink: #ffffff;
+    --warn: #9a5b00;
+    --warn-bg: #fff3dc;
+    --bad: #a8201a;
+    --bad-bg: #fde8e6;
+    --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+    --font-body: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1412;
+      --surface: #161e1b;
+      --surface-2: #1f2a26;
+      --ink: #e8f0ed;
+      --ink-soft: #9fb0aa;
+      --line: #2c3a35;
+      --accent: #3fc6a5;
+      --accent-ink: #06201a;
+      --warn: #f0b95a;
+      --warn-bg: #2e2412;
+      --bad: #ff8d84;
+      --bad-bg: #331a18;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1412;
+    --surface: #161e1b;
+    --surface-2: #1f2a26;
+    --ink: #e8f0ed;
+    --ink-soft: #9fb0aa;
+    --line: #2c3a35;
+    --accent: #3fc6a5;
+    --accent-ink: #06201a;
+    --warn: #f0b95a;
+    --warn-bg: #2e2412;
+    --bad: #ff8d84;
+    --bad-bg: #331a18;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.5;
+    padding-block: 28px 48px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+  header h1 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(1.6rem, 4vw, 2.2rem);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  header p { margin: 0; color: var(--ink-soft); max-width: 60ch; }
+
+  .bench { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 800px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+  }
+
+  .kinds { display: flex; flex-wrap: wrap; gap: 6px; }
+  .kinds button {
+    font: 500 13px/1 var(--font-body);
+    padding: 9px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .kinds button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .fields { display: flex; flex-direction: column; gap: 12px; }
+  label, .lbl {
+    display: flex; flex-direction: column; gap: 5px;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  input[type="text"], input[type="url"], input[type="tel"], input[type="email"], input[type="password"], textarea, select {
+    font: 400 15px/1.4 var(--font-body);
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px 11px;
+    width: 100%;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 400;
+  }
+  textarea { min-height: 96px; resize: vertical; }
+  :where(button, input, select, textarea, summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 460px) { .row2 { grid-template-columns: minmax(0, 1fr); } }
+
+  .rule { border: 0; border-top: 1px solid var(--line); margin: 0; }
+  h2 {
+    font-family: var(--font-display); font-weight: 600; font-size: 1rem; margin: 0; letter-spacing: -0.005em;
+  }
+
+  .range { display: flex; align-items: center; gap: 10px; }
+  .range input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); }
+  .range output { font: 500 13px var(--font-mono); min-width: 5.5ch; text-align: right; color: var(--ink); text-transform: none; letter-spacing: 0; }
+
+  .color { display: flex; align-items: center; gap: 10px; }
+  .color input[type="color"] {
+    width: 44px; height: 38px; padding: 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); cursor: pointer;
+  }
+  .color code { font: 400 13px var(--font-mono); color: var(--ink); text-transform: none; letter-spacing: 0; }
+
+  .note { font-size: 13px; padding: 9px 11px; border-radius: 6px; margin: 0; }
+  .note.warn { background: var(--warn-bg); color: var(--warn); }
+  .note.bad { background: var(--bad-bg); color: var(--bad); }
+
+  .preview { position: sticky; top: env(safe-area-inset-top, 0px); }
+  @media (max-width: 800px) { .preview { position: static; } }
+  .stage {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px;
+    display: grid;
+    place-items: center;
+    background:
+      repeating-conic-gradient(var(--surface-2) 0% 25%, var(--surface) 0% 50%) 50% / 16px 16px;
+    min-height: 200px;
+  }
+  .stage img { display: block; width: 100%; max-width: 340px; height: auto; image-rendering: pixelated; border-radius: 2px; }
+  .stage .empty { color: var(--ink-soft); text-align: center; padding: 40px 10px; max-width: 28ch; }
+
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 16px; font: 400 12.5px var(--font-mono); color: var(--ink-soft); margin: 0; }
+  .meta b { color: var(--ink); font-weight: 500; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .btn {
+    font: 600 14px/1 var(--font-body);
+    padding: 12px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .hint { margin: 0; font-size: 13px; color: var(--ink-soft); }
+  .status { min-height: 1.4em; margin: 0; font-size: 13px; color: var(--accent); }
+
+  details.tips { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 14px 18px; }
+  details.tips summary { cursor: pointer; font-family: var(--font-display); font-weight: 600; }
+  details.tips ul { margin: 12px 0 0; padding-left: 18px; color: var(--ink-soft); display: flex; flex-direction: column; gap: 6px; max-width: 70ch; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .btn, .kinds button { transition: background-color 0.12s, border-color 0.12s; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Generador de códigos QR</h1>
+    <p>Escribe un enlace, un texto o los datos de una red Wi‑Fi. El código se actualiza mientras escribes y funciona sin conexión a un servidor.</p>
+  </header>
+
+  <div class="bench">
+    <section class="panel" aria-label="Contenido y estilo">
+      <div class="lbl" id="kind-label">Tipo de contenido</div>
+      <div class="kinds" role="group" aria-labelledby="kind-label" id="kinds">
+        <button type="button" data-kind="text" aria-pressed="true">Enlace o texto</button>
+        <button type="button" data-kind="wifi" aria-pressed="false">Wi‑Fi</button>
+        <button type="button" data-kind="whatsapp" aria-pressed="false">WhatsApp</button>
+        <button type="button" data-kind="email" aria-pressed="false">Correo</button>
+        <button type="button" data-kind="tel" aria-pressed="false">Teléfono</button>
+      </div>
+
+      <div class="fields" id="fields"></div>
+
+      <hr class="rule">
+      <h2>Estilo</h2>
+
+      <div class="row2">
+        <label for="fg-color">Color del código
+          <span class="color"><input type="color" id="fg-color" value="#121a18"><code id="fg-code">#121a18</code></span>
+        </label>
+        <label for="bg-color">Color del fondo
+          <span class="color"><input type="color" id="bg-color" value="#ffffff"><code id="bg-code">#ffffff</code></span>
+        </label>
+      </div>
+      <p class="note warn" id="contrast-note" hidden></p>
+
+      <label for="size">Tamaño de la imagen
+        <span class="range"><input type="range" id="size" min="200" max="1200" step="20" value="640"><output id="size-out" for="size">640 px</output></span>
+      </label>
+      <label for="margin">Margen blanco
+        <span class="range"><input type="range" id="margin" min="0" max="10" step="1" value="4"><output id="margin-out" for="margin">4 módulos</output></span>
+      </label>
+      <label for="ecc">Corrección de errores
+        <select id="ecc">
+          <option value="L">Baja (7 %): más datos, menos resistencia</option>
+          <option value="M" selected>Media (15 %): equilibrada</option>
+          <option value="Q">Alta (25 %): para impresión</option>
+          <option value="H">Máxima (30 %): admite desgaste o un logo encima</option>
+        </select>
+      </label>
+    </section>
+
+    <section class="panel preview" aria-label="Vista previa">
+      <div class="stage" id="stage" aria-live="polite"><div class="empty">Escribe algo para generar el código.</div></div>
+      <p class="note bad" id="error" role="alert" hidden></p>
+      <p class="meta" id="meta" hidden></p>
+      <div class="actions">
+        <button type="button" class="btn primary" id="dl-png" disabled>Descargar PNG</button>
+        <button type="button" class="btn" id="dl-svg" disabled>Descargar SVG</button>
+        <button type="button" class="btn" id="copy-img" disabled>Copiar imagen</button>
+      </div>
+      <p class="status" id="status" role="status"></p>
+      <p class="hint" id="hint">Si la descarga no está disponible en tu pantalla, mantén pulsado el código (o clic derecho) y elige guardar imagen.</p>
+    </section>
+  </div>
+
+  <details class="tips">
+    <summary>Antes de imprimirlo</summary>
+    <ul>
+      <li>Usa un código oscuro sobre fondo claro. Si invierte los colores, muchos lectores no lo reconocen.</li>
+      <li>Deja al menos 4 módulos de margen blanco alrededor.</li>
+      <li>Para imprimir, elige corrección Alta o Máxima y un archivo SVG, que no pierde nitidez al ampliarlo.</li>
+      <li>Prueba siempre el código con tu teléfono antes de mandarlo a imprenta.</li>
+      <li>Cuanto más texto contiene, más pequeños y densos son los cuadros. Un enlace corto escanea mejor.</li>
+    </ul>
+  </details>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  // UTF-8 so accents, ñ and emoji encode correctly.
+  if (window.qrcode) {
+    window.qrcode.stringToBytes = function (s) { return Array.prototype.slice.call(new TextEncoder().encode(s)); };
+  }
+
+  // ---- Content types -------------------------------------------------------
+  var KINDS = {
+    text: {
+      fields: [
+        { id: "text", label: "Enlace o texto", type: "textarea", value: "https://example.com", placeholder: "https://… o cualquier texto" }
+      ],
+      build: function (v) { return v.text; }
+    },
+    wifi: {
+      fields: [
+        { id: "ssid", label: "Nombre de la red (SSID)", type: "text", value: "", placeholder: "MiRed" },
+        { id: "pass", label: "Contraseña", type: "text", value: "", placeholder: "Déjala vacía si la red es abierta" },
+        { id: "sec", label: "Seguridad", type: "select", value: "WPA", options: [["WPA", "WPA / WPA2 / WPA3"], ["WEP", "WEP"], ["nopass", "Sin contraseña"]] },
+        { id: "hidden", label: "Red oculta", type: "select", value: "no", options: [["no", "No"], ["si", "Sí"]] }
+      ],
+      build: function (v) {
+        if (!v.ssid) return "";
+        var esc = function (s) { return String(s).replace(/([\\;,:"])/g, "\\$1"); };
+        var sec = v.sec === "nopass" ? "nopass" : v.sec;
+        var out = "WIFI:T:" + sec + ";S:" + esc(v.ssid) + ";";
+        if (sec !== "nopass" && v.pass) out += "P:" + esc(v.pass) + ";";
+        if (v.hidden === "si") out += "H:true;";
+        return out + ";";
+      }
+    },
+    whatsapp: {
+      fields: [
+        { id: "num", label: "Número con código de país", type: "tel", value: "", placeholder: "Solo dígitos, sin + ni espacios" },
+        { id: "msg", label: "Mensaje inicial (opcional)", type: "textarea", value: "", placeholder: "Hola, quiero más información" }
+      ],
+      build: function (v) {
+        var n = (v.num || "").replace(/\D/g, "");
+        if (!n) return "";
+        return "https://wa.me/" + n + (v.msg ? "?text=" + encodeURIComponent(v.msg) : "");
+      }
+    },
+    email: {
+      fields: [
+        { id: "to", label: "Dirección de correo", type: "email", value: "", placeholder: "nombre@dominio.com" },
+        { id: "subj", label: "Asunto (opcional)", type: "text", value: "", placeholder: "" },
+        { id: "body", label: "Mensaje (opcional)", type: "textarea", value: "", placeholder: "" }
+      ],
+      build: function (v) {
+        if (!v.to) return "";
+        var q = [];
+        if (v.subj) q.push("subject=" + encodeURIComponent(v.subj));
+        if (v.body) q.push("body=" + encodeURIComponent(v.body));
+        return "mailto:" + v.to.trim() + (q.length ? "?" + q.join("&") : "");
+      }
+    },
+    tel: {
+      fields: [
+        { id: "phone", label: "Número de teléfono", type: "tel", value: "", placeholder: "+código de país y número" }
+      ],
+      build: function (v) {
+        var p = (v.phone || "").replace(/[^\d+]/g, "");
+        return p ? "tel:" + p : "";
+      }
+    }
+  };
+
+  var state = { kind: "text", values: {}, png: null, svg: null, blobUrl: null };
+
+  // ---- Form rendering ------------------------------------------------------
+  function renderFields() {
+    var def = KINDS[state.kind];
+    var host = $("fields");
+    host.textContent = "";
+    def.fields.forEach(function (f) {
+      var wrap = document.createElement("label");
+      wrap.setAttribute("for", "f-" + f.id);
+      wrap.appendChild(document.createTextNode(f.label));
+      var el;
+      if (f.type === "textarea") {
+        el = document.createElement("textarea");
+      } else if (f.type === "select") {
+        el = document.createElement("select");
+        f.options.forEach(function (o) {
+          var op = document.createElement("option");
+          op.value = o[0]; op.textContent = o[1];
+          el.appendChild(op);
+        });
+      } else {
+        el = document.createElement("input");
+        el.type = f.type;
+        if (f.type === "tel") el.inputMode = "tel";
+        el.autocomplete = "off";
+      }
+      el.id = "f-" + f.id;
+      if (f.placeholder) el.placeholder = f.placeholder;
+      var saved = state.values[state.kind] && state.values[state.kind][f.id];
+      el.value = saved !== undefined ? saved : f.value;
+      el.addEventListener("input", generate);
+      el.addEventListener("change", generate);
+      wrap.appendChild(el);
+      host.appendChild(wrap);
+    });
+  }
+
+  function readValues() {
+    var out = {};
+    KINDS[state.kind].fields.forEach(function (f) {
+      var el = $("f-" + f.id);
+      out[f.id] = el ? el.value : "";
+    });
+    state.values[state.kind] = out;
+    return out;
+  }
+
+  // ---- Colour helpers ------------------------------------------------------
+  function lum(hex) {
+    var n = parseInt(hex.slice(1), 16);
+    var c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(function (v) {
+      v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  }
+  function contrast(a, b) {
+    var la = lum(a), lb = lum(b);
+    return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+  }
+
+  // ---- Generation ----------------------------------------------------------
+  function setStatus(msg) { $("status").textContent = msg || ""; }
+
+  function setOutputsEnabled(on) {
+    ["dl-png", "dl-svg", "copy-img"].forEach(function (id) { $(id).disabled = !on; });
+  }
+
+  function showError(msg) {
+    var e = $("error");
+    e.hidden = !msg;
+    e.textContent = msg || "";
+  }
+
+  function generate() {
+    setStatus("");
+    var fg = $("fg-color").value, bg = $("bg-color").value;
+    $("fg-code").textContent = fg;
+    $("bg-code").textContent = bg;
+    $("size-out").textContent = $("size").value + " px";
+    var m = parseInt($("margin").value, 10);
+    $("margin-out").textContent = m + (m === 1 ? " módulo" : " módulos");
+
+    // Contrast guidance
+    var note = $("contrast-note");
+    var ratio = contrast(fg, bg);
+    if (lum(fg) > lum(bg)) {
+      note.hidden = false;
+      note.textContent = "El código es más claro que el fondo. Algunos lectores no escanean códigos invertidos.";
+    } else if (ratio < 4) {
+      note.hidden = false;
+      note.textContent = "Contraste bajo (" + ratio.toFixed(1) + ":1). Oscurece el código o aclara el fondo para que se lea bien.";
+    } else {
+      note.hidden = true;
+    }
+
+    var values = readValues();
+    var text = KINDS[state.kind].build(values);
+
+    if (!text) {
+      state.png = null; state.svg = null;
+      $("stage").innerHTML = '<div class="empty">Completa los datos para generar el código.</div>';
+      $("meta").hidden = true;
+      showError("");
+      setOutputsEnabled(false);
+      return;
+    }
+
+    var qr;
+    try {
+      qr = window.qrcode(0, $("ecc").value);
+      qr.addData(text);
+      qr.make();
+    } catch (err) {
+      state.png = null; state.svg = null;
+      $("stage").innerHTML = '<div class="empty">No se pudo generar el código.</div>';
+      $("meta").hidden = true;
+      showError("El contenido es demasiado largo para un código QR con este nivel de corrección. Acórtalo o elige una corrección más baja.");
+      setOutputsEnabled(false);
+      return;
+    }
+    showError("");
+
+    var n = qr.getModuleCount();
+    var total = n + m * 2;
+    var px = parseInt($("size").value, 10);
+    // Use whole pixels per module so edges stay sharp.
+    var scale = Math.max(1, Math.floor(px / total));
+    var side = scale * total;
+
+    // PNG via canvas
+    var canvas = document.createElement("canvas");
+    canvas.width = side; canvas.height = side;
+    var ctx = canvas.getContext("2d");
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, side, side);
+    ctx.fillStyle = fg;
+    for (var r = 0; r < n; r++) {
+      for (var c = 0; c < n; c++) {
+        if (qr.isDark(r, c)) ctx.fillRect((c + m) * scale, (r + m) * scale, scale, scale);
+      }
+    }
+    state.canvas = canvas;
+    state.png = canvas.toDataURL("image/png");
+
+    // SVG (one path, scalable)
+    var d = [];
+    for (var rr = 0; rr < n; rr++) {
+      var run = -1;
+      for (var cc = 0; cc <= n; cc++) {
+        var dark = cc < n && qr.isDark(rr, cc);
+        if (dark && run < 0) run = cc;
+        if (!dark && run >= 0) {
+          d.push("M" + (run + m) + " " + (rr + m) + "h" + (cc - run) + "v1h-" + (cc - run) + "z");
+          run = -1;
+        }
+      }
+    }
+    state.svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + total + " " + total +
+      '" width="' + side + '" height="' + side + '" shape-rendering="crispEdges">' +
+      '<rect width="' + total + '" height="' + total + '" fill="' + bg + '"/>' +
+      '<path fill="' + fg + '" d="' + d.join("") + '"/></svg>';
+
+    var stage = $("stage");
+    stage.textContent = "";
+    var img = document.createElement("img");
+    img.src = state.png;
+    img.alt = "Código QR generado";
+    stage.appendChild(img);
+
+    var meta = $("meta");
+    meta.hidden = false;
+    meta.innerHTML = "";
+    [["Versión", qr.typeNumber ? qr.typeNumber() : "—"], ["Módulos", n + "×" + n], ["Imagen", side + "×" + side + " px"]].forEach(function (p) {
+      var s = document.createElement("span");
+      s.appendChild(document.createTextNode(p[0] + " "));
+      var b = document.createElement("b"); b.textContent = p[1];
+      s.appendChild(b);
+      meta.appendChild(s);
+    });
+
+    setOutputsEnabled(true);
+  }
+
+  // ---- Output actions ------------------------------------------------------
+  var downloads = null;
+  function slug() {
+    var base = { text: "codigo-qr", wifi: "qr-wifi", whatsapp: "qr-whatsapp", email: "qr-correo", tel: "qr-telefono" }[state.kind];
+    return base;
+  }
+
+  function saveFile(filename, data, label) {
+    if (!downloads) {
+      setStatus("La descarga directa no está disponible aquí. Mantén pulsado el código para guardarlo.");
+      return;
+    }
+    downloads.save({ filename: filename, data: data }).then(function () {
+      setStatus(label + " guardado.");
+    }).catch(function (err) {
+      var code = err && err.code;
+      if (code === "declined") { setStatus("Descarga cancelada."); }
+      else if (code === "rate_limited") { setStatus("Espera un momento e inténtalo de nuevo."); }
+      else { setStatus("No se pudo guardar el archivo desde esta vista. Mantén pulsado el código para guardarlo."); }
+    });
+  }
+
+  $("dl-png").addEventListener("click", function () {
+    if (!state.canvas) return;
+    state.canvas.toBlob(function (blob) {
+      if (!blob) { setStatus("No se pudo preparar el PNG."); return; }
+      saveFile(slug() + ".png", blob, "PNG");
+    }, "image/png");
+  });
+
+  $("dl-svg").addEventListener("click", function () {
+    if (!state.svg) return;
+    saveFile(slug() + ".svg", state.svg, "SVG");
+  });
+
+  $("copy-img").addEventListener("click", function () {
+    if (!state.canvas) return;
+    state.canvas.toBlob(function (blob) {
+      var ok = blob && navigator.clipboard && window.ClipboardItem;
+      if (!ok) { setStatus("Tu navegador no permite copiar imágenes aquí. Mantén pulsado el código para guardarlo."); return; }
+      navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]).then(function () {
+        setStatus("Imagen copiada.");
+      }).catch(function () {
+        setStatus("No se pudo copiar la imagen. Mantén pulsado el código para guardarlo.");
+      });
+    }, "image/png");
+  });
+
+  // ---- Wiring --------------------------------------------------------------
+  $("kinds").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-kind]");
+    if (!b) return;
+    readValues();
+    state.kind = b.getAttribute("data-kind");
+    Array.prototype.forEach.call($("kinds").children, function (x) {
+      x.setAttribute("aria-pressed", x === b ? "true" : "false");
+    });
+    renderFields();
+    generate();
+  });
+
+  ["fg-color", "bg-color", "size", "margin", "ecc"].forEach(function (id) {
+    $(id).addEventListener("input", generate);
+    $(id).addEventListener("change", generate);
+  });
+
+  renderFields();
+  if (window.qrcode) {
+    generate();
+  } else {
+    showError("No se pudo cargar la librería que genera los códigos. Revisa tu conexión y recarga la página.");
+  }
+
+  // Direct downloads need the viewer's permission; hide nothing if it is absent, the buttons explain the fallback.
+  if (window.claude && window.claude.use) {
+    window.claude.use("downloads").then(function (d) {
+      downloads = d;
+      if (!d) $("hint").textContent = "La descarga directa no está disponible en esta vista. Mantén pulsado el código (o clic derecho) y elige guardar imagen.";
+    }).catch(function () { downloads = null; });
+  }
+})();
+</script>
+
+</body></html>
